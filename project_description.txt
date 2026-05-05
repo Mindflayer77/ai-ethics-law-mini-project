@@ -1,0 +1,14 @@
+Projekty:
+1. Audyt licencji w repozytorium
+Napisz skrypt (Python/Bash/Typescript) skanujący zależności projektu (requirements.txt, package.json, itp.) i sprawdzający ich licencje.
+
+Base: Skrypt wypisuje listę zależności z licencjami. Tabelka wyników.
+Good: + analiza kompatybilności licencji między sobą, oznaczenie konfliktów, wizualizacja.
+Excellent: + rekomendacja licencji dla Waszego projektu, integracja z CI (GitHub Action), policy document.
+
+Chcę stworzyć narzędzie do automatycznego skanowania zależności projektu pod kątem licencji. Skrypt będzie pobierał dane z rejestrów PyPI i npm, klasyfikował każdą zależność według poziomu ryzyka prawnego oraz wykrywał konflikty kompatybilności między
+licencjami. Wyniki będą przedstawione w postaci raportu HTML z wizualnym profilem ryzyka i listą konkretnych kroków do podjęcia. Przedstawiony będzie m.in. % licencji bezpiecznych, copyleft, a także zależności bez określonej licencji. 
+Przy każdej z licencji będzie znajdować się opis licencji, a także potencjalnie wytłumaczenie, dlaczego została przydzielona do poszczególnej kategorii. 
+Opisy licencji będą pozyskane z takich stron jak: https://choosealicense.com/appendix/, https://spdx.org/licenses/, https://www.tldrlegal.com/verified, https://www.gnu.org/licenses/license-compatibility.html.
+Stworzony skrypt będzie zintegrowany z Github Actions. Skrypt będzie uruchamiany przy każdym pull requeście i blokować merge w przypadku wykrycia licencji wysokiego ryzyka.
+Planuję też potencjalnie dodać osobną funkcjonalność z wykorzystaniem LLM, który na podstawie opisu projektu oraz zbioru dostępnych licencji wraz z ich opisami, zasugeruje licencję dla repozytorium.

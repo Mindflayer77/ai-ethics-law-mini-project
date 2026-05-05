@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Raport audytu licencji — ai-research-assistant</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background: #f0f2f5;
+      color: #1a1a2e;
+      line-height: 1.6;
+    }
+    /* Nagłówek */
+    header {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: #fff;
+      padding: 2.5rem 2rem 2rem;
+    }
+    header h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 0.3rem; }
+    header .meta { font-size: 0.88rem; opacity: 0.75; }
+    header .meta span { margin-right: 1.5rem; }
+    /* Kontener główny */
+    .container { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
+    /* Karty podsumowania */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      padding: 1.2rem 1.4rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      border-left: 4px solid var(--kolor);
+    }
+    .card .liczba { font-size: 2.2rem; font-weight: 800; color: var(--kolor); line-height: 1; }
+    .card .etykieta { font-size: 0.82rem; color: #666; margin-top: 0.3rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    /* Sekcja wykresu + legendy */
+    .wizualizacja {
+      display: grid;
+      grid-template-columns: 260px 1fr;
+      gap: 2rem;
+      align-items: center;
+      background: #fff;
+      border-radius: 10px;
+      padding: 1.8rem 2rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      margin-bottom: 2rem;
+    }
+    @media (max-width: 680px) { .wizualizacja { grid-template-columns: 1fr; } }
+    .wykres-tytul { font-size: 1.1rem; font-weight: 700; margin-bottom: 1.2rem; }
+    .legenda { list-style: none; }
+    .legenda li {
+      display: flex;
+      align-items: center;
+      gap: 0.7rem;
+      padding: 0.45rem 0;
+      border-bottom: 1px solid #f0f0f0;
+      font-size: 0.9rem;
+    }
+    .legenda li:last-child { border-bottom: none; }
+    .legenda .kolor-krotka {
+      width: 14px;
+      height: 14px;
+      border-radius: 3px;
+      flex-shrink: 0;
+    }
+    .legenda .proc { margin-left: auto; font-weight: 600; }
+    /* Tabele */
+    .sekcja {
+      background: #fff;
+      border-radius: 10px;
+      padding: 1.8rem 2rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      margin-bottom: 2rem;
+    }
+    .sekcja h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 1.2rem;
+      padding-bottom: 0.6rem;
+      border-bottom: 2px solid #f0f0f0;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+    thead tr { background: #f8f9fa; }
+    thead th {
+      padding: 0.7rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      color: #555;
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      border-bottom: 2px solid #e9ecef;
+    }
+    tbody tr { border-bottom: 1px solid #f0f2f5; transition: background 0.15s; }
+    tbody tr:hover { background: #f8f9fa; }
+    tbody td { padding: 0.7rem 1rem; vertical-align: top; }
+    .td-opis { color: #555; font-size: 0.82rem; line-height: 1.5; word-wrap: break-word; min-width: 200px; }
+    /* Odznaki ryzyka */
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .badge-bezpieczna    { background: #d5f5e3; color: #1e8449; }
+    .badge-slabe_copyleft { background: #fef9e7; color: #9a7d0a; }
+    .badge-silne_copyleft { background: #fdedec; color: #c0392b; }
+    .badge-wlascnosci    { background: #f5eef8; color: #7d3c98; }
+    .badge-nieznana      { background: #f2f3f4; color: #5d6d7e; }
+    /* Konflikty */
+    .konflikt-karta {
+      border: 1px solid #f5c6cb;
+      border-radius: 8px;
+      padding: 1rem 1.2rem;
+      margin-bottom: 1rem;
+      background: #fff5f5;
+    }
+    .konflikt-karta .naglowek {
+      font-weight: 700;
+      color: #c0392b;
+      margin-bottom: 0.4rem;
+      font-size: 0.95rem;
+    }
+    .konflikt-karta .opis { font-size: 0.85rem; color: #555; }
+    /* Rekomendacje */
+    .rekomendacja {
+      padding: 0.85rem 1.1rem;
+      border-radius: 7px;
+      margin-bottom: 0.8rem;
+      font-size: 0.88rem;
+      line-height: 1.6;
+      border-left: 4px solid;
+    }
+    .rek-ok      { background: #d5f5e3; border-color: #2ecc71; color: #1e8449; }
+    .rek-info    { background: #eaf4fb; border-color: #3498db; color: #1a5276; }
+    .rek-uwaga   { background: #fef9e7; border-color: #f39c12; color: #9a7d0a; }
+    .rek-blad    { background: #fdedec; border-color: #e74c3c; color: #922b21; }
+    /* Stopka */
+    footer {
+      text-align: center;
+      padding: 1.5rem;
+      font-size: 0.8rem;
+      color: #999;
+    }
+    /* Link */
+    a { color: #0f3460; text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    .pakiet-link { font-weight: 600; }
+    .emoji { font-style: normal; }
+    /* Stan: brak danych */
+    .brak-danych { text-align: center; padding: 2rem; color: #aaa; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>🔍 Raport audytu licencji</h1>
+  <div class="meta">
+    <span>📁 Projekt: <strong>ai-research-assistant</strong></span>
+    <span>📅 Data: 2026-05-05 22:24</span>
+    <span>📦 Zależności: 13</span>
+    
+    <span style="color:#6bff6b; font-weight:700;">✅ Brak krytycznych problemów</span>
+    
+  </div>
+</header>
+
+<div class="container">
+
+  <!-- Karty podsumowania -->
+  <div class="cards">
+    <div class="card" style="--kolor: #2ecc71">
+      <div class="liczba">12</div>
+      <div class="etykieta">Bezpieczne (permissive)</div>
+    </div>
+    <div class="card" style="--kolor: #f39c12">
+      <div class="liczba">1</div>
+      <div class="etykieta">Słabe copyleft</div>
+    </div>
+    <div class="card" style="--kolor: #e74c3c">
+      <div class="liczba">0</div>
+      <div class="etykieta">Silne copyleft (GPL/AGPL)</div>
+    </div>
+    <div class="card" style="--kolor: #9b59b6">
+      <div class="liczba">0</div>
+      <div class="etykieta">Własnościowe</div>
+    </div>
+    <div class="card" style="--kolor: #95a5a6">
+      <div class="liczba">0</div>
+      <div class="etykieta">Nieznane</div>
+    </div>
+    <div class="card" style="--kolor: #e74c3c">
+      <div class="liczba">0</div>
+      <div class="etykieta">Konflikty licencji</div>
+    </div>
+  </div>
+
+  <!-- Wizualizacja: wykres + legenda -->
+  <div class="wizualizacja">
+    <div>
+      <div class="wykres-tytul">Profil ryzyka licencyjnego</div>
+      <svg width="220" height="220" viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg"><circle cx="110" cy="110" r="81" fill="none" stroke="#2ecc71" stroke-width="38" stroke-dasharray="469.75 39.19" stroke-dashoffset="127.23" transform="rotate(-90 110 110)"><title>Bezpieczna (permissive): 92.3%</title></circle><circle cx="110" cy="110" r="81" fill="none" stroke="#f39c12" stroke-width="38" stroke-dasharray="39.19 469.75" stroke-dashoffset="-342.52" transform="rotate(-90 110 110)"><title>Słabe copyleft: 7.7%</title></circle><text x="110" y="102" text-anchor="middle" font-size="28" font-weight="800" fill="#1a1a2e">100</text><text x="110" y="126" text-anchor="middle" font-size="12" fill="#888">dep.</text></svg>
+    </div>
+    <div>
+      <ul class="legenda">
+        
+        <li>
+          <span class="kolor-krotka" style="background:#2ecc71"></span>
+          <span>Bezpieczna (permissive)</span>
+          <span class="proc">12 (92.3%)</span>
+        </li>
+        
+        <li>
+          <span class="kolor-krotka" style="background:#f39c12"></span>
+          <span>Słabe copyleft</span>
+          <span class="proc">1 (7.7%)</span>
+        </li>
+        
+        <li>
+          <span class="kolor-krotka" style="background:#e74c3c"></span>
+          <span>Silne copyleft</span>
+          <span class="proc">0 (0.0%)</span>
+        </li>
+        
+        <li>
+          <span class="kolor-krotka" style="background:#9b59b6"></span>
+          <span>Własnościowa</span>
+          <span class="proc">0 (0.0%)</span>
+        </li>
+        
+        <li>
+          <span class="kolor-krotka" style="background:#95a5a6"></span>
+          <span>Nieznana</span>
+          <span class="proc">0 (0.0%)</span>
+        </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  <!-- Rekomendacje -->
+  <div class="sekcja">
+    <h2>📋 Rekomendacje</h2>
+    
+    
+    <div class="rekomendacja rek-uwaga">ℹ️ MPL/EPL — COPYLEFT NA POZIOMIE PLIKU: Pakiety [tqdm] pozwalają na swobodne mieszanie ich plików z kodem zamkniętym. Musisz jednak udostępnić kody źródłowe w przypadku jakiejkolwiek zmiany konkretnych plików objętych licencją MPL/EPL.</div>
+    
+    
+    <div class="rekomendacja rek-ok">✅ Brak krytycznych problemów licencyjnych. Projekt korzysta z łagodnych licencji (Permissive). Pamiętaj jednak, że starsze licencje (np. MIT, BSD) mogą nie zawierać wyraźnej ochrony przed roszczeniami patentowymi (w odróżnieniu od Apache-2.0).</div>
+    
+  </div>
+
+  <!-- Konflikty -->
+  
+
+  <!-- Lista zależności -->
+  <div class="sekcja">
+    <h2>📦 Lista zależności (13)</h2>
+    
+    <table>
+      <thead>
+        <tr>
+          <th>Pakiet</th>
+          <th>Wersja</th>
+          <th>Ekosystem</th>
+          <th>Licencja</th>
+          <th>Ryzyko</th>
+          <th>Opis licencji</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        <tr>
+          <td>
+            <a class="pakiet-link"
+               href="https://pypi.org/project/tqdm/"
+               target="_blank"
+               rel="noopener noreferrer">
+              tqdm
+            </a>
+          </td>
+          <td>4.67.3</td>
+          <td>
+            <span class="badge" style="background:#e8f4f8;color:#2980b9;">
+              pypi
+            </span>
+          </td>
+          <td>
+            
+            <a href="https://spdx.org/licenses/MPL-2.0.html"
+               target="_blank" rel="noopener noreferrer"
+               title="Mozilla Public License 2.0">
+              MPL-2.0
+            </a>
+            
+          </td>
+          <td>
+            <span class="badge badge-nieznana">
+              Słabe copyleft
+            </span>
+          </td>
+          <td class="td-opis">Licencja na poziomie pliku (file-level copyleft) od Mozilla Foundation. Zmienione pliki objęte MPL muszą być udostępnione na tej samej licencji, ale można je łączyć z kodem na innych licencjach (w tym własnościowych) w oddzielnych plikach. Kompatybilna z GPL-2.0+ i Apache-2.0.</td>
+        </tr>
+        
+        <tr>
+          <td>
+            <a class="pakiet-link"
+               href="https://pypi.org/project/cerebras-cloud-sdk/"
+               target="_blank"
+               rel="noopener noreferrer">
+              cerebras-cloud-sdk
+            </a>
+          </td>
+          <td>1.67.0</td>
+          <td>
+            <span class="badge" style="background:#e8f4f8;color:#2980b9;">
+              pypi
+            </span>
+          </td>
+          <td>
+            
+            <a href="https://spdx.org/licenses/Apache-2.0.html"
+               target="_blank" rel="noopener noreferrer"
+               title="Apache License 2.0">
+              Apache-2.0
+            </a>
+            
+          </td>
+          <td>
+            <span class="badge badge-bezpieczna">
+              Bezpieczna (permissive)
+            </span>
+          </td>
+          <td class="td-opis">Permissive licencja od Apache Software Foundation. Zawiera wyraźną klauzulę patentową chroniącą użytkowników przed roszczeniami patentowymi ze strony współtwórców. Wymaga zachowania informacji o zmianach w plikach. Kompatybilna z GPL-3.0, ale NIEKOMPATYBILNA z GPL-2.0-only ze względu na wymogi klauzuli patentowej.</td>
+        </tr>
+        
+        <tr>
+          <td>
+            <a class="pakiet-link"
+               href="https://pypi.org/project/google-genai/"
+               target="_blank"
+               rel="noopener noreferrer">
+              google-genai
+            </a>
+          </td>
+          <td>1.74.0</td>
+          <td>
+            <span class="badge" style="background:#e8f4f8;color:#2980b9;">
+              pypi
+            </span>
+          </td>
+          <td>
+            
+            <a href="https://spdx.org/licenses/Apache-2.0.html"
+               target="_blank" rel="noopener noreferrer"
+               title="Apache License 2.0">
+              Apache-2.0
+            </a>
+            
+          </td>
+          <td>
+            <span class="badge badge-bezpieczna">
+              Bezpieczna (permissive)
+            </span>
+          </td>
+          <td class="td-opis">Permissive licencja od Apache Software Foundation. Zawiera wyraźną klauzulę patentową chroniącą użytkowników przed roszczeniami patentowymi ze strony współtwórców. Wymaga zachowania informacji o zmianach w plikach. Kompatybilna z GPL-3.0, ale NIEKOMPATYBILNA z GPL-2.0-only ze względu na wymogi klauzuli patentowej.</td>
+        </tr>
+        
+        <tr>
+          <td>
+            <a class="pakiet-link"
+               href="https://pypi.org/project/langchain-core/"
+               target="_blank"
+               rel="noopener noreferrer">
+              langchain-core
+            </a>
+          </td>
+          <td>1.3.3</td>
+          <td>
+            <span class="badge" style="background:#e8f4f8;color:#2980b9;">
+              pypi
+            </span>
+          </td>
+          <td>
+            
+            <a href="https://spdx.org/licenses/MIT.html"
+               target="_blank" rel="noopener noreferrer"
+               title="MIT License">
+              MIT
+            </a>
+            
+          </td>
+          <td>
+            <span class="badge badge-bezpieczna">
+              Bezpieczna (permissive)
+            </span>
+          </td>
+          <td class="td-opis">Jedna z najbardziej popularnych i liberalnych licencji open-source. Pozwala na dowolne użycie, kopiowanie, modyfikowanie, łączenie, publikowanie, dystrybucję i sprzedaż oprogramowania bez ograniczeń, pod warunkiem zachowania informacji o prawach autorskich. W pełni kompatybilna z licencjami własnościowymi i GPL.</td>
+        </tr>
+        
+        <tr>
+          <td>
+            <a class="pakiet-link"
+               href="https://pypi.org/project/langchain-google-genai/"
+               target="_blank"
+               rel="noopener noreferrer">
+              langchain-google-genai
+            </a>
+          </td>
+          <td>4.2.2</td>
+          <td>
+            <span class="badge" style="background:#e8f4f8;color:#2980b9;">
+              pypi
+            </span>
+          </td>
+          <td>
+            
+            <a href="https://spdx.org/licenses/MIT.html"
+               target="_blank" rel="noopener noreferrer"
+               title="MIT License">
+              MIT
+            </a>
+            
+          </td>
+          <td>
+            <span class="badge badge-bezpieczna">
+              Bezpieczna (permissive)
+            </span>
+          </td>
+          <td class="td-opis">Jedna z najbardziej popularnych i liberalnych licencji open-source. Pozwala na dowolne użycie, kopiowanie, modyfikowanie, łączenie, publikowanie, dystrybucję i sprzedaż oprogramowania bez ograniczeń, pod warunkiem zachowania informacji o prawach autorskich. W pełni kompatybilna z licencjami własnościowymi i GPL.</td>
+        </tr>
+        
+        <tr>
+          <td>
+            <a class="pakiet-link"
+               href="https://pypi.org/project/numpy/"
+               target="_blank"
+               rel="noopener noreferrer">
+              numpy
+            </a>
+          </td>
+          <td>2.4.4</td>
+          <td>
+            <span class="badge" style="background:#e8f4f8;color:#2980b9;">
+              pypi
+            </span>
+          </td>
+          <td>
+            
+            <a href="https://spdx.org/licenses/BSD-3-Clause.html"
+               target="_blank" rel="noopener noreferrer"
+               title="BSD 3-Clause &#34;New&#34; or &#34;Revised&#34; License">
+              BSD-3-Clause
+            </a>
+            
+          </td>
+          <td>
+            <span class="badge badge-bezpieczna">
+              Bezpieczna (permissive)
+            </span>
+          </td>
+          <td class="td-opis">Licencja BSD z trzema klauzulami. Podobna do BSD-2-Clause, ale dodaje zakaz używania nazwy projektu i autorów do promocji produktów pochodnych bez pisemnej zgody. Szeroko stosowana przez projekty akademickie i badawcze.</td>
+        </tr>
+        
+        <tr>
+          <td>
+            <a class="pakiet-link"
+               href="https://pypi.org/project/openai/"
+               target="_blank"
+               rel="noopener noreferrer">
+              openai
+            </a>
+          </td>
+          <td>2.34.0</td>
+          <td>
+            <span class="badge" style="background:#e8f4f8;color:#2980b9;">
+              pypi
+            </span>
+          </td>
+          <td>
+            
+            <a href="https://spdx.org/licenses/Apache-2.0.html"
+               target="_blank" rel="noopener noreferrer"
+               title="Apache License 2.0">
+              Apache-2.0
+            </a>
+            
+          </td>
+          <td>
+            <span class="badge badge-bezpieczna">
+              Bezpieczna (permissive)
+            </span>
+          </td>
+          <td class="td-opis">Permissive licencja od Apache Software Foundation. Zawiera wyraźną klauzulę patentową chroniącą użytkowników przed roszczeniami patentowymi ze strony współtwórców. Wymaga zachowania informacji o zmianach w plikach. Kompatybilna z GPL-3.0, ale NIEKOMPATYBILNA z GPL-2.0-only ze względu na wymogi klauzuli patentowej.</td>
+        </tr>
+        
+        <tr>
+          <td>
+            <a class="pakiet-link"
+               href="https://pypi.org/project/pandas/"
+               target="_blank"
+               rel="noopener noreferrer">
+              pandas
+            </a>
+          </td>
+          <td>3.0.2</td>
+          <td>
+            <span class="badge" style="background:#e8f4f8;color:#2980b9;">
+              pypi
+            </span>
+          </td>
+          <td>
+            
+            <a href="https://spdx.org/licenses/BSD-3-Clause.html"
+               target="_blank" rel="noopener noreferrer"
+               title="BSD 3-Clause &#34;New&#34; or &#34;Revised&#34; License">
+              BSD-3-Clause
+            </a>
+            
+          </td>
+          <td>
+            <span class="badge badge-bezpieczna">
+              Bezpieczna (permissive)
+            </span>
+          </td>
+          <td class="td-opis">Licencja BSD z trzema klauzulami. Podobna do BSD-2-Clause, ale dodaje zakaz używania nazwy projektu i autorów do promocji produktów pochodnych bez pisemnej zgody. Szeroko stosowana przez projekty akademickie i badawcze.</td>
+        </tr>
+        
+        <tr>
+          <td>
+            <a class="pakiet-link"
+               href="https://pypi.org/project/pydantic/"
+               target="_blank"
+               rel="noopener noreferrer">
+              pydantic
+            </a>
+          </td>
+          <td>2.13.3</td>
+          <td>
+            <span class="badge" style="background:#e8f4f8;color:#2980b9;">
+              pypi
+            </span>
+          </td>
+          <td>
+            
+            <a href="https://spdx.org/licenses/MIT.html"
+               target="_blank" rel="noopener noreferrer"
+               title="MIT License">
+              MIT
+            </a>
+            
+          </td>
+          <td>
+            <span class="badge badge-bezpieczna">
+              Bezpieczna (permissive)
+            </span>
+          </td>
+          <td class="td-opis">Jedna z najbardziej popularnych i liberalnych licencji open-source. Pozwala na dowolne użycie, kopiowanie, modyfikowanie, łączenie, publikowanie, dystrybucję i sprzedaż oprogramowania bez ograniczeń, pod warunkiem zachowania informacji o prawach autorskich. W pełni kompatybilna z licencjami własnościowymi i GPL.</td>
+        </tr>
+        
+        <tr>
+          <td>
+            <a class="pakiet-link"
+               href="https://pypi.org/project/python-dotenv/"
+               target="_blank"
+               rel="noopener noreferrer">
+              python-dotenv
+            </a>
+          </td>
+          <td>1.2.2</td>
+          <td>
+            <span class="badge" style="background:#e8f4f8;color:#2980b9;">
+              pypi
+            </span>
+          </td>
+          <td>
+            
+            <a href="https://spdx.org/licenses/BSD-3-Clause.html"
+               target="_blank" rel="noopener noreferrer"
+               title="BSD 3-Clause &#34;New&#34; or &#34;Revised&#34; License">
+              BSD-3-Clause
+            </a>
+            
+          </td>
+          <td>
+            <span class="badge badge-bezpieczna">
+              Bezpieczna (permissive)
+            </span>
+          </td>
+          <td class="td-opis">Licencja BSD z trzema klauzulami. Podobna do BSD-2-Clause, ale dodaje zakaz używania nazwy projektu i autorów do promocji produktów pochodnych bez pisemnej zgody. Szeroko stosowana przez projekty akademickie i badawcze.</td>
+        </tr>
+        
+        <tr>
+          <td>
+            <a class="pakiet-link"
+               href="https://pypi.org/project/pyyaml/"
+               target="_blank"
+               rel="noopener noreferrer">
+              pyyaml
+            </a>
+          </td>
+          <td>6.0.3</td>
+          <td>
+            <span class="badge" style="background:#e8f4f8;color:#2980b9;">
+              pypi
+            </span>
+          </td>
+          <td>
+            
+            <a href="https://spdx.org/licenses/MIT.html"
+               target="_blank" rel="noopener noreferrer"
+               title="MIT License">
+              MIT
+            </a>
+            
+          </td>
+          <td>
+            <span class="badge badge-bezpieczna">
+              Bezpieczna (permissive)
+            </span>
+          </td>
+          <td class="td-opis">Jedna z najbardziej popularnych i liberalnych licencji open-source. Pozwala na dowolne użycie, kopiowanie, modyfikowanie, łączenie, publikowanie, dystrybucję i sprzedaż oprogramowania bez ograniczeń, pod warunkiem zachowania informacji o prawach autorskich. W pełni kompatybilna z licencjami własnościowymi i GPL.</td>
+        </tr>
+        
+        <tr>
+          <td>
+            <a class="pakiet-link"
+               href="https://pypi.org/project/torch/"
+               target="_blank"
+               rel="noopener noreferrer">
+              torch
+            </a>
+          </td>
+          <td>2.11.0</td>
+          <td>
+            <span class="badge" style="background:#e8f4f8;color:#2980b9;">
+              pypi
+            </span>
+          </td>
+          <td>
+            
+            <a href="https://spdx.org/licenses/BSD-3-Clause.html"
+               target="_blank" rel="noopener noreferrer"
+               title="BSD 3-Clause &#34;New&#34; or &#34;Revised&#34; License">
+              BSD-3-Clause
+            </a>
+            
+          </td>
+          <td>
+            <span class="badge badge-bezpieczna">
+              Bezpieczna (permissive)
+            </span>
+          </td>
+          <td class="td-opis">Licencja BSD z trzema klauzulami. Podobna do BSD-2-Clause, ale dodaje zakaz używania nazwy projektu i autorów do promocji produktów pochodnych bez pisemnej zgody. Szeroko stosowana przez projekty akademickie i badawcze.</td>
+        </tr>
+        
+        <tr>
+          <td>
+            <a class="pakiet-link"
+               href="https://pypi.org/project/vllm/"
+               target="_blank"
+               rel="noopener noreferrer">
+              vllm
+            </a>
+          </td>
+          <td>0.20.1</td>
+          <td>
+            <span class="badge" style="background:#e8f4f8;color:#2980b9;">
+              pypi
+            </span>
+          </td>
+          <td>
+            
+            <a href="https://spdx.org/licenses/Apache-2.0.html"
+               target="_blank" rel="noopener noreferrer"
+               title="Apache License 2.0">
+              Apache-2.0
+            </a>
+            
+          </td>
+          <td>
+            <span class="badge badge-bezpieczna">
+              Bezpieczna (permissive)
+            </span>
+          </td>
+          <td class="td-opis">Permissive licencja od Apache Software Foundation. Zawiera wyraźną klauzulę patentową chroniącą użytkowników przed roszczeniami patentowymi ze strony współtwórców. Wymaga zachowania informacji o zmianach w plikach. Kompatybilna z GPL-3.0, ale NIEKOMPATYBILNA z GPL-2.0-only ze względu na wymogi klauzuli patentowej.</td>
+        </tr>
+        
+      </tbody>
+    </table>
+    
+  </div>
+
+  <!-- Źródła plików -->
+  <div class="sekcja">
+    <h2>📂 Przeskanowane pliki manifestowe</h2>
+    <ul style="padding-left:1.2rem; font-size:0.88rem; color:#555; line-height:2">
+      
+      <li><code>/home/mindflayer/Projects/ai-ethics-law-mini-project/tmp/ai-research-assistant/pyproject.toml</code></li>
+      
+      
+    </ul>
+  </div>
+
+</div>
+
+<footer>
+  Wygenerowano przez <strong>audyt-licencji</strong> |
+  Mini-projekt: Aspekty prawne, społeczne i etyczne w AI | PWr 2025/2026 |
+  2026-05-05 22:24
+</footer>
+
+</body>
+</html>
