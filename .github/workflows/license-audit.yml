@@ -1,0 +1,223 @@
+# Audyt licencji zależności — GitHub Actions
+#
+# Cel: Automatyczne skanowanie licencji przy każdym pull request i push na main.
+# Blokuje merge jeśli wykryto licencje silnego copyleft (GPL/AGPL) lub własnościowe.
+#
+# Wymogi AI Act (Rozporządzenie UE 2024/1689):
+# - Art. 13 (Przejrzystość): systemy AI wysokiego ryzyka muszą zapewniać przejrzystość
+# - Audyt licencji jest częścią due diligence dla zgodności z regulacjami
+#
+# Konfiguracja:
+# - OPENAI_API_KEY (opcjonalne): dla rekomendacji licencji przez LLM
+# - Ustaw sekret w: Settings → Secrets and variables → Actions
+
+name: Audyt licencji
+
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      # Uruchamiaj tylko gdy zmienią się pliki manifestowe
+      - "requirements*.txt"
+      - "pyproject.toml"
+      - "package.json"
+      - "Pipfile"
+      - "setup.cfg"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "requirements*.txt"
+      - "pyproject.toml"
+      - "package.json"
+      - "Pipfile"
+      - "setup.cfg"
+  # Możliwość ręcznego uruchomienia
+  workflow_dispatch:
+    inputs:
+      strict:
+        description: "Tryb ścisły (błąd również dla słabego copyleft i nieznanych)"
+        required: false
+        default: false
+        type: boolean
+      suggest_license:
+        description: "Wygeneruj rekomendację licencji przez LLM"
+        required: false
+        default: false
+        type: boolean
+
+# Uprawnienia: tylko odczyt (zasada minimalnych uprawnień)
+permissions:
+  contents: read
+  pull-requests: write  # do komentowania w PR
+
+jobs:
+  audyt-licencji:
+    name: 🔍 Audyt licencji
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Pobierz kod
+        uses: actions/checkout@v4
+
+      - name: Zainstaluj uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Skonfiguruj Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Zainstaluj zależności projektu
+        run: uv sync
+
+      - name: Cache licencji (PyPI/npm)
+        uses: actions/cache@v4
+        with:
+          path: .cache/licencje_cache.json
+          key: licencje-cache-${{ runner.os }}-${{ hashFiles('**/pyproject.toml', '**/requirements*.txt', '**/package.json') }}
+          restore-keys: |
+            licencje-cache-${{ runner.os }}-
+
+      - name: Uruchom audyt licencji
+        id: audyt
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          # Ustaw tryb ścisły jeśli uruchomiono ręcznie z opcją strict=true
+          STRICT_FLAG=""
+          if [[ "${{ github.event.inputs.strict }}" == "true" ]]; then
+            STRICT_FLAG="--strict"
+          fi
+
+          # Uruchom audyt w trybie CI (--check = wyjście z kodem 1 przy problemach)
+          uv run src/main.py \
+            --check \
+            --format html \
+            --output wyniki/raport_licencji_ci.html \
+            $STRICT_FLAG \
+            .
+
+      - name: Zapisz raport jako artefakt
+        uses: actions/upload-artifact@v4
+        if: always()  # Zawsze zapisuj raport, nawet przy błędzie
+        with:
+          name: raport-licencji-${{ github.run_number }}
+          path: wyniki/raport_licencji_ci.html
+          retention-days: 30
+
+      - name: Generuj raport JSON
+        if: always()
+        run: |
+          uv run src/main.py \
+            --format json \
+            --output wyniki/raport_licencji_ci.json \
+            --quiet \
+            .
+
+      - name: Zapisz raport JSON jako artefakt
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: raport-licencji-json-${{ github.run_number }}
+          path: wyniki/raport_licencji_ci.json
+          retention-days: 30
+
+      - name: Skomentuj w PR z wynikami audytu
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request' && always()
+        with:
+          script: |
+            const fs = require('fs');
+
+            // Wczytaj raport JSON
+            let komentarz = '## 🔍 Wyniki audytu licencji\n\n';
+
+            try {
+              const dane = JSON.parse(
+                fs.readFileSync('wyniki/raport_licencji_ci.json', 'utf8')
+              );
+              const pod = dane.podsumowanie;
+
+              // Status
+              if (pod.ma_wysokie_ryzyko) {
+                komentarz += '❌ **Wykryto problemy licencyjne!**\n\n';
+              } else {
+                komentarz += '✅ **Brak krytycznych problemów licencyjnych**\n\n';
+              }
+
+              // Tabela statystyk
+              komentarz += '| Poziom ryzyka | Liczba | % |\n';
+              komentarz += '|:---|:---:|:---:|\n';
+              const stats = pod.statystyki_ryzyka;
+              const procs = pod.procenty_ryzyka;
+              komentarz += `| ✅ Bezpieczne (permissive) | ${stats.bezpieczna} | ${procs.bezpieczna}% |\n`;
+              komentarz += `| ⚠️ Słabe copyleft | ${stats['słabe_copyleft']} | ${procs['słabe_copyleft']}% |\n`;
+              komentarz += `| 🔴 Silne copyleft (GPL/AGPL) | ${stats.silne_copyleft} | ${procs.silne_copyleft}% |\n`;
+              komentarz += `| 🔒 Własnościowe | ${stats['własnościowa']} | ${procs['własnościowa']}% |\n`;
+              komentarz += `| ❓ Nieznane | ${stats.nieznana} | ${procs.nieznana}% |\n`;
+              komentarz += `| ⚡ Konflikty | ${pod.liczba_konfliktow} | — |\n\n`;
+
+              // Rekomendacje
+              if (dane.rekomendacje && dane.rekomendacje.length > 0) {
+                komentarz += '### Rekomendacje\n\n';
+                dane.rekomendacje.forEach(rek => {
+                  komentarz += `- ${rek}\n`;
+                });
+                komentarz += '\n';
+              }
+
+              komentarz += `\n*Łącznie przeskanowano ${pod.liczba_zaleznie} zależności. `;
+              komentarz += `Pełny raport dostępny jako [artefakt akcji](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}).*`;
+
+            } catch (e) {
+              komentarz += `⚠️ Nie udało się wczytać wyników audytu: ${e.message}\n`;
+            }
+
+            // Znajdź istniejący komentarz bota i zaktualizuj lub utwórz nowy
+            const { data: komentarze } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const botKomentarz = komentarze.find(k =>
+              k.user.type === 'Bot' && k.body.includes('Wyniki audytu licencji')
+            );
+
+            if (botKomentarz) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: botKomentarz.id,
+                body: komentarz,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: komentarz,
+              });
+            }
+
+      - name: Rekomendacja licencji przez LLM (opcjonalne)
+        if: github.event.inputs.suggest_license == 'true' && env.OPENAI_API_KEY != ''
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          uv run src/main.py \
+            --suggest-license \
+            --quiet \
+            .
+          echo "Rekomendacja LLM wygenerowana w wyniki/rekomendacja_licencji_llm.md"
+
+      - name: Zapisz rekomendację LLM jako artefakt
+        uses: actions/upload-artifact@v4
+        if: github.event.inputs.suggest_license == 'true' && always()
+        with:
+          name: rekomendacja-licencji-llm-${{ github.run_number }}
+          path: wyniki/rekomendacja_licencji_llm.md
+          retention-days: 30
